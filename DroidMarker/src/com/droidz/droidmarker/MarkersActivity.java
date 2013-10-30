@@ -25,6 +25,7 @@ import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
 import android.graphics.PixelFormat;
 import android.graphics.Typeface;
 import android.media.MediaScannerConnection;
@@ -820,6 +821,8 @@ public class MarkersActivity extends Activity {
         try {
             Bitmap b = MediaStore.Images.Media.getBitmap(getContentResolver(), contentUri);
             if (b != null) {
+                b = checkImageOrientation(b);
+                
                 mSlate.paintBitmap(b);
                 if (DEBUG) Log.d(TAG, "successfully loaded bitmap: " + b);
             } else {
@@ -831,7 +834,35 @@ public class MarkersActivity extends Activity {
             Log.e(TAG, "error loading image from " + contentUri + ": " + ex);
         }
     }
-
+private Bitmap checkImageOrientation( Bitmap b ) {
+         int bWidth = b.getWidth();
+         int bHeight = b.getHeight();
+         int slateWidth = mSlate.getWidth();
+         int slateHeight = mSlate.getHeight();
+        
+         boolean doRotate = false;
+         // insert the bitmap with best fit orientation
+         if (bWidth > bHeight) {
+             // image is landscape
+             if (slateWidth < slateHeight) {
+                 // view is portrait, rotate bitmap
+                 doRotate = true;
+             }
+         }else{
+             // image is portrait
+             if (slateWidth > slateHeight) {
+                 // view is lanscape, rotate bitmap
+                 doRotate = true;
+             }
+         }
+         if (doRotate) {
+             Matrix matrix = new Matrix();
+             matrix.postRotate(90);
+             b = Bitmap.createBitmap(b , 0, 0, bWidth, bHeight, matrix, true);
+         }
+         return b;
+     }
+     
     protected void onActivityResult(int requestCode, int resultCode, Intent imageReturnedIntent) { 
         super.onActivityResult(requestCode, resultCode, imageReturnedIntent); 
 
