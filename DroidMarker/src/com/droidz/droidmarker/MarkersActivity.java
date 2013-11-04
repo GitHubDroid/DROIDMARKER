@@ -1,14 +1,17 @@
 package com.droidz.droidmarker;
 
+
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
-
-import com.droidz.droidmarker.ToolButton.SwatchButton;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -53,6 +56,11 @@ import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import org.dsandler.apps.markers.R;
+import com.droidz.droidmarker.ToolButton.SwatchButton;
+
+
 
 public class MarkersActivity extends Activity {
 
@@ -129,7 +137,6 @@ public class MarkersActivity extends Activity {
                 }
             };
 
-
     public static class ColorList extends LinearLayout {
         public ColorList(Context c, AttributeSet as) {
             super(c, as);
@@ -152,7 +159,7 @@ public class MarkersActivity extends Activity {
 
     @Override
     public Object onRetainNonConfigurationInstance() {
-    	((ViewGroup)mSlate.getParent()).removeView(mSlate);
+            ((ViewGroup)mSlate.getParent()).removeView(mSlate);
         return mSlate;
     }
     
@@ -199,26 +206,26 @@ public class MarkersActivity extends Activity {
         setContentView(R.layout.main);
         
         // check if there is a request to save to a particular path
-         Bundle extras = getIntent().getExtras();
-         if (extras != null) {
-             String outputSavePath = extras.getString(MediaStore.EXTRA_OUTPUT);
-             if (outputSavePath != null) {
-                 File outputSaveFile = new File(outputSavePath);
-                 File parentFolder = outputSaveFile.getParentFile();
-                 if (parentFolder != null && parentFolder.exists()) {
-                     mOutputSavePath = outputSavePath;
-                     if (DEBUG) Log.d(TAG, "outputSavePath defined: " + mOutputSavePath);
-                 }
-             }
-         }
-         
+        Bundle extras = getIntent().getExtras();
+        if (extras != null) {
+            String outputSavePath = extras.getString(MediaStore.EXTRA_OUTPUT);
+            if (outputSavePath != null) {
+                File outputSaveFile = new File(outputSavePath);
+                File parentFolder = outputSaveFile.getParentFile();
+                if (parentFolder != null && parentFolder.exists()) {
+                    mOutputSavePath = outputSavePath;
+                    if (DEBUG) Log.d(TAG, "outputSavePath defined: " + mOutputSavePath);
+                }
+            }
+        }
+        
         mSlate = (Slate) getLastNonConfigurationInstance();
         if (mSlate == null) {
-        	mSlate = new Slate(this);
+                mSlate = new Slate(this);
 
-        	// Load the old buffer if necessary
-              	if (!mJustLoadedImage && mOutputSavePath == null) {
-                    loadDrawing(WIP_FILENAME, true);
+                // Load the old buffer if necessary
+            if (!mJustLoadedImage && mOutputSavePath == null) {
+                loadDrawing(WIP_FILENAME, true);
             } else {
                 mJustLoadedImage = false;
             }
@@ -396,13 +403,27 @@ public class MarkersActivity extends Activity {
     @Override
     public void onPause() {
         super.onPause();
-        
-            try {
-             File wipOuputFile = getOuputFile(WIP_FILENAME, true);
-             saveDrawing(wipOuputFile, true);
-            } catch (Exception e) {
-             Log.e(TAG, "save: error: " + e);
-         }
+        try {
+            if (mOutputSavePath == null) {
+                File wipOuputFile = getOuputFile(WIP_FILENAME, true);
+                saveDrawing(wipOuputFile, false);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "save: error: " + e);
+        }
+    }
+    
+    @Override
+    public void finish() {
+        try {
+            if (mOutputSavePath != null) {
+                File ouputFile = getOuputFile(null, true);
+                saveDrawing(ouputFile);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "save: error: " + e);
+        }
+        super.finish();
     }
 
     @Override
@@ -419,7 +440,7 @@ public class MarkersActivity extends Activity {
 
     @Override
     public void onConfigurationChanged (Configuration newConfig) {
-    	super.onConfigurationChanged(newConfig);
+            super.onConfigurationChanged(newConfig);
     }
 
     @Override
@@ -454,15 +475,15 @@ public class MarkersActivity extends Activity {
         if (DEBUG) Log.d(TAG, "starting with intent=" + startIntent + " extras=" + dumpBundle(startIntent.getExtras()));
         String a = startIntent.getAction();
         if (a != null) {
-             if (a.equals(Intent.ACTION_EDIT)) {
-                 // XXX: what happens to the old drawing? we should really move to auto-save
-                 mSlate.clear();
-                 loadImageFromIntent(startIntent);
-             } else if (a.equals(Intent.ACTION_SEND)) {
-                 // XXX: what happens to the old drawing? we should really move to auto-save
-                 mSlate.clear();
-                 loadImageFromContentUri((Uri) startIntent.getParcelableExtra(Intent.EXTRA_STREAM));
-             }
+            if (a.equals(Intent.ACTION_EDIT)) {
+                // XXX: what happens to the old drawing? we should really move to auto-save
+                mSlate.clear();
+                loadImageFromIntent(startIntent);
+            } else if (a.equals(Intent.ACTION_SEND)) {
+                // XXX: what happens to the old drawing? we should really move to auto-save
+                mSlate.clear();
+                loadImageFromContentUri((Uri) startIntent.getParcelableExtra(Intent.EXTRA_STREAM));
+            }
         }
     }
 
@@ -614,22 +635,26 @@ public class MarkersActivity extends Activity {
         return false;
     }
 
- 
-        public void saveDrawing(File file) {
-         saveDrawing(file, false);
+    public void saveDrawing(File file) {
+        saveDrawing(file, false);
     }
 
-      public void saveDrawing(File file, boolean temporary) {
-         saveDrawing(file, temporary, /*animate=*/ false, /*share=*/ false, /*clear=*/ false);
+    public void saveDrawing(File file, boolean temporary) {
+        saveDrawing(file, temporary, /*animate=*/ false, /*share=*/ false, /*clear=*/ false);
     }
 
-   public void saveDrawing(File file, boolean temporary, boolean animate, boolean share, boolean clear) {
-             Bitmap localBits;
-         if (mOutputSavePath==null) {
-             localBits = mSlate.copyBitmap(/*withBackground=*/!temporary);
-         }else{
-             localBits = mSlate.copyBitmap(true);
-         }
+    public void saveDrawing(File file, boolean temporary, boolean animate, boolean share, boolean clear) {
+        Bitmap localBits;
+        if (mOutputSavePath==null) {
+            localBits = mSlate.copyBitmap(/*withBackground=*/!temporary);
+        }else{
+            localBits = mSlate.copyBitmap(true);
+            try {
+                saveGeopaparazziExtras(file);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
         if (localBits == null) {
             if (DEBUG) Log.e(TAG, "save: null bitmap");
             return;
@@ -645,20 +670,22 @@ public class MarkersActivity extends Activity {
             protected String doInBackground(Void... params) {
                 String fn = null;
                 try {
-                     if (DEBUG) Log.d(TAG, "save: saving " + _file);
-                     OutputStream os = new FileOutputStream(_file);
+
+                    if (DEBUG) Log.d(TAG, "save: saving " + _file);
+                    OutputStream os = new FileOutputStream(_file);
                     if (_file.getName().toLowerCase().endsWith("png")) {
-                         _localBits.compress(Bitmap.CompressFormat.PNG, 0, os);
-                     } else if (_file.getName().toLowerCase().endsWith("jpg")) {
-                         _localBits.compress(Bitmap.CompressFormat.JPEG, 90, os);
-                     }else{
-                         // try png anyways for now
-                         _localBits.compress(Bitmap.CompressFormat.PNG, 0, os);
-                     }
-                     _localBits.recycle();
+                        _localBits.compress(Bitmap.CompressFormat.PNG, 0, os);
+                    } else if (_file.getName().toLowerCase().endsWith("jpg")) {
+                        _localBits.compress(Bitmap.CompressFormat.JPEG, 90, os);
+                    }else{
+                        // try png anyways for now
+                        _localBits.compress(Bitmap.CompressFormat.PNG, 0, os);
+                    }
+                    _localBits.recycle();
                     os.close();
                     
                     fn = _file.toString();
+                    
                 } catch (IOException e) {
                     Log.e(TAG, "save: error: " + e);
                 }
@@ -667,17 +694,17 @@ public class MarkersActivity extends Activity {
             
             @Override
             protected void onPostExecute(String fn) {
-                if (fn != null) {
-                    synchronized(mDrawingsToScan) {
-                        mDrawingsToScan.add(fn);
-                        if (_share) {
-                            mPendingShareFile = fn;
-                        }
-                        if (!mMediaScannerConnection.isConnected()) {
-                            mMediaScannerConnection.connect(); // will scan the files and share them
-                        }
-                    }
-                }
+//                if (fn != null) {
+//                    synchronized(mDrawingsToScan) {
+//                        mDrawingsToScan.add(fn);
+//                        if (_share) {
+//                            mPendingShareFile = fn;
+//                        }
+//                        if (!mMediaScannerConnection.isConnected()) {
+//                            mMediaScannerConnection.connect(); // will scan the files and share them
+//                        }
+//                    }
+//                }
 
                 if (_clear) mSlate.clear();
             }
@@ -685,83 +712,144 @@ public class MarkersActivity extends Activity {
         
     }
     
-      
-     /**
+    private void saveGeopaparazziExtras( File imageFile ) throws IOException {
+        String keyLong = "LONGITUDE";
+        String keyLat = "LATITUDE";
+        String keyElev = "ELEVATION";
+        String keyPath = "PREFS_KEY_PATH";
+        
+        Bundle extras = getIntent().getExtras();
+        double lon;
+        double lat;
+        double elevation;
+        if (extras != null) {
+            lon = extras.getDouble(keyLong);
+            lat = extras.getDouble(keyLat);
+            elevation = extras.getDouble(keyElev);
+        } else {
+            setResult(Activity.RESULT_CANCELED);
+            return;
+        }
+        
+        if (lon == 0 && lat == 0) {
+            setResult(Activity.RESULT_CANCELED);
+            return;
+        }
+
+        Intent intent = getIntent();
+        intent.putExtra(keyPath, imageFile.getAbsolutePath());
+        intent.putExtra(keyLat, lat);
+        intent.putExtra(keyLong, lon);
+        intent.putExtra(keyElev, elevation);
+        setResult(Activity.RESULT_OK, intent);
+
+        File imageFolder = imageFile.getParentFile();
+        String name = imageFile.getName();
+        int lastDot = name.lastIndexOf("."); //$NON-NLS-1$
+        String nameNoExt = name.substring(0, lastDot);
+        String propFileName = nameNoExt + ".properties";
+        File imagePropertiesFile = new File(imageFolder, propFileName);
+        if (!imagePropertiesFile.exists()) {
+            SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMdd_HHmmss"); //$NON-NLS-1$
+            Date currentDate = new Date();
+            String currentDatestring = formatter.format(currentDate);
+
+            // create props file
+            BufferedWriter bW = null;
+            try {
+                bW = new BufferedWriter(new FileWriter(imagePropertiesFile));
+                bW.write("latitude=");
+                bW.write(String.valueOf(lat));
+                bW.write("\nlongitude=");
+                bW.write(String.valueOf(lon));
+                bW.write("\naltim=");
+                bW.write(String.valueOf(elevation));
+                bW.write("\nutctimestamp=");
+                bW.write(currentDatestring);
+            } finally {
+                if (bW != null)
+                    bW.close();
+            }
+        }
+        setResult(Activity.RESULT_OK, intent);
+    }
+    
+    
+    /**
      * Prepares the output {@link File} to write to.
-      * 
-      * <p>The output file can be defined by the incoming intent, in which case 
-      * <code>mOutputSavePath != null</code> and the input parameters are ignored.
-      * </p>
-      * <p>If instead no output is defined by intent, the file path
-      * is constructed on the fly by means of the incoming parameters.
-      * </p> 
-      * 
-      * @param proposedFileName the proposed file name to be used in case of file path
-      *         generation.
-      * @param temporary flag to define the folder to which to save to.
-      * @return the output file name, for which the existence of the parent folder
-      *          is assured. 
-      * @throws IOException
-      */
-     private File getOuputFile(String proposedFileName, boolean temporary ) throws IOException {
-         if (mOutputSavePath != null) {
-             return new File(mOutputSavePath);
-         } else {
-             String filename;
-             if (proposedFileName != null) {
-                 filename = proposedFileName;
-             } else {
-                 filename = System.currentTimeMillis() + ".png";
-             }
-             
-             File d = getPicturesDirectory();
-             d = new File(d, temporary ? IMAGE_TEMP_DIRNAME : IMAGE_SAVE_DIRNAME);
-             if (!d.exists()) {
-                 if (d.mkdirs()) {
-                     if (temporary) {
-                         final File noMediaFile = new File(d, MediaStore.MEDIA_IGNORE_FILENAME);
-                         if (!noMediaFile.exists()) {
-                             new FileOutputStream(noMediaFile).write('\n');
-                         }
-                     }
-                 } else {
-                     throw new IOException("cannot create dirs: " + d);
-                 }
-             }
-             File file = new File(d, filename);
-             return file;
-         }
-     }
+     * 
+     * <p>The output file can be defined by the incoming intent, in which case 
+     * <code>mOutputSavePath != null</code> and the input parameters are ignored.
+     * </p>
+     * <p>If instead no output is defined by intent, the file path
+     * is constructed on the fly by means of the incoming parameters.
+     * </p> 
+     * 
+     * @param proposedFileName the proposed file name to be used in case of file path
+     *         generation.
+     * @param temporary flag to define the folder to which to save to.
+     * @return the output file name, for which the existence of the parent folder
+     *          is assured. 
+     * @throws IOException
+     */
+    private File getOuputFile(String proposedFileName, boolean temporary ) throws IOException {
+        if (mOutputSavePath != null) {
+            return new File(mOutputSavePath);
+        } else {
+            String filename;
+            if (proposedFileName != null) {
+                filename = proposedFileName;
+            } else {
+                filename = System.currentTimeMillis() + ".png";
+            }
+            
+            File d = getPicturesDirectory();
+            d = new File(d, temporary ? IMAGE_TEMP_DIRNAME : IMAGE_SAVE_DIRNAME);
+            if (!d.exists()) {
+                if (d.mkdirs()) {
+                    if (temporary) {
+                        final File noMediaFile = new File(d, MediaStore.MEDIA_IGNORE_FILENAME);
+                        if (!noMediaFile.exists()) {
+                            new FileOutputStream(noMediaFile).write('\n');
+                        }
+                    }
+                } else {
+                    throw new IOException("cannot create dirs: " + d);
+                }
+            }
+            File file = new File(d, filename);
+            return file;
+        }
+    }
 
     public void clickSave(View v) {
         if (mSlate.isEmpty()) return;
         
         try {
-             v.setEnabled(false);
-             final File file = getOuputFile(null, false); 
-             saveDrawing(file);
-             Toast.makeText(this, "Drawing saved: " + file, Toast.LENGTH_SHORT).show();
-         } catch (IOException e) {
-             Log.e(TAG, "save: error: " + e);
-         } finally {
-             v.setEnabled(true);
-         }
+            v.setEnabled(false);
+            final File file = getOuputFile(null, false); 
+            saveDrawing(file);
+            Toast.makeText(this, "Drawing saved: " + file, Toast.LENGTH_SHORT).show();
+        } catch (IOException e) {
+            Log.e(TAG, "save: error: " + e);
+        } finally {
+            v.setEnabled(true);
+        }
     }
 
     public void clickSaveAndClear(View v) {
         if (mSlate.isEmpty()) return;
-
         try {
-             v.setEnabled(false);
-             final File file = getOuputFile(null, false); 
-             saveDrawing(file, 
-                     /*temporary=*/ false, /*animate=*/ true, /*share=*/ false, /*clear=*/ true);
-             Toast.makeText(this, "Drawing saved: " + file, Toast.LENGTH_SHORT).show();
-         } catch (IOException e) {
-             Log.e(TAG, "save: error: " + e);
-         } finally {
-             v.setEnabled(true);
-         }
+            v.setEnabled(false);
+            final File file = getOuputFile(null, false); 
+            saveDrawing(file, 
+                    /*temporary=*/ false, /*animate=*/ true, /*share=*/ false, /*clear=*/ true);
+            Toast.makeText(this, "Drawing saved: " + file, Toast.LENGTH_SHORT).show();
+        } catch (IOException e) {
+            Log.e(TAG, "save: error: " + e);
+        } finally {
+            v.setEnabled(true);
+        }
     }
 
     private void setThingyEnabled(Object v, boolean enabled) {
@@ -772,19 +860,19 @@ public class MarkersActivity extends Activity {
 
     public void clickShare(View v) {
         try{
-             hideOverflow();
-             setThingyEnabled(v, false);
-             final File file = getOuputFile(null, false);
-             // can't use a truly temporary file because:
-             // - we want mediascanner to give us a content: URI for it; some apps don't like file: URIs
-             // - if mediascanner scans it, it will show up in Gallery, so it might as well be a regular drawing
-             saveDrawing(file,
-                     /*temporary=*/ false, /*animate=*/ false, /*share=*/ true, /*clear=*/ false);
-         } catch (IOException e) {
-             Log.e(TAG, "save: error: " + e);
-         } finally {
-             setThingyEnabled(v, true);
-         }
+            hideOverflow();
+            setThingyEnabled(v, false);
+            final File file = getOuputFile(null, false);
+            // can't use a truly temporary file because:
+            // - we want mediascanner to give us a content: URI for it; some apps don't like file: URIs
+            // - if mediascanner scans it, it will show up in Gallery, so it might as well be a regular drawing
+            saveDrawing(file,
+                    /*temporary=*/ false, /*animate=*/ false, /*share=*/ true, /*clear=*/ false);
+        } catch (IOException e) {
+            Log.e(TAG, "save: error: " + e);
+        } finally {
+            setThingyEnabled(v, true);
+        }
     }
 
     public void clickLoad(View unused) {
@@ -823,7 +911,7 @@ public class MarkersActivity extends Activity {
         hideOverflow();
         Intent sendIntent = new Intent(Intent.ACTION_SEND);
         sendIntent.setType("text/plain");
-        sendIntent.putExtra(Intent.EXTRA_SUBJECT, getString(R.string.app_name));
+        sendIntent.putExtra(Intent.EXTRA_SUBJECT, getString(R.string.app_name2));
         sendIntent.putExtra(Intent.EXTRA_TEXT,
                 "http://play.google.com/store/apps/details?id=" + getPackageName());
         startActivity(Intent.createChooser(sendIntent, "Share the Markers app with:"));
@@ -867,7 +955,7 @@ public class MarkersActivity extends Activity {
             WindowManager.LayoutParams winParams = dialogWin.getAttributes();
             winParams.width = WindowManager.LayoutParams.WRAP_CONTENT;
             winParams.height = WindowManager.LayoutParams.WRAP_CONTENT;
-            winParams.y = getResources().getDimensionPixelOffset(R.dimen.action_bar_height);
+            winParams.y = getResources().getDimensionPixelOffset(R.dimen.action_bar_height2);
             dialogWin.setAttributes(winParams);
             dialogWin.setWindowAnimations(android.R.style.Animation_Translucent);
             dialogWin.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
@@ -900,9 +988,9 @@ public class MarkersActivity extends Activity {
     protected void loadImageFromContentUri(Uri contentUri) {
         Toast.makeText(this, "Loading from " + contentUri, Toast.LENGTH_SHORT).show();
 
-         // load the temporary image only if no file has been supplied to edit
-         if(mOutputSavePath == null)
-             loadDrawing(WIP_FILENAME, true);
+        // load the temporary image only if no file has been supplied to edit
+        if(mOutputSavePath == null)
+            loadDrawing(WIP_FILENAME, true);
         mJustLoadedImage = true;
 
         try {
@@ -921,35 +1009,36 @@ public class MarkersActivity extends Activity {
             Log.e(TAG, "error loading image from " + contentUri + ": " + ex);
         }
     }
-private Bitmap checkImageOrientation( Bitmap b ) {
-         int bWidth = b.getWidth();
-         int bHeight = b.getHeight();
-         int slateWidth = mSlate.getWidth();
-         int slateHeight = mSlate.getHeight();
+
+    private Bitmap checkImageOrientation( Bitmap b ) {
+        int bWidth = b.getWidth();
+        int bHeight = b.getHeight();
+        int slateWidth = mSlate.getWidth();
+        int slateHeight = mSlate.getHeight();
         
-         boolean doRotate = false;
-         // insert the bitmap with best fit orientation
-         if (bWidth > bHeight) {
-             // image is landscape
-             if (slateWidth < slateHeight) {
-                 // view is portrait, rotate bitmap
-                 doRotate = true;
-             }
-         }else{
-             // image is portrait
-             if (slateWidth > slateHeight) {
-                 // view is lanscape, rotate bitmap
-                 doRotate = true;
-             }
-         }
-         if (doRotate) {
-             Matrix matrix = new Matrix();
-             matrix.postRotate(90);
-             b = Bitmap.createBitmap(b , 0, 0, bWidth, bHeight, matrix, true);
-         }
-         return b;
-     }
-     
+        boolean doRotate = false;
+        // insert the bitmap with best fit orientation
+        if (bWidth > bHeight) {
+            // image is landscape
+            if (slateWidth < slateHeight) {
+                // view is portrait, rotate bitmap
+                doRotate = true;
+            }
+        }else{
+            // image is portrait
+            if (slateWidth > slateHeight) {
+                // view is lanscape, rotate bitmap
+                doRotate = true;
+            }
+        }
+        if (doRotate) {
+            Matrix matrix = new Matrix();
+            matrix.postRotate(90);
+            b = Bitmap.createBitmap(b , 0, 0, bWidth, bHeight, matrix, true);
+        }
+        return b;
+    }
+
     protected void onActivityResult(int requestCode, int resultCode, Intent imageReturnedIntent) { 
         super.onActivityResult(requestCode, resultCode, imageReturnedIntent); 
 
